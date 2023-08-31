@@ -1,63 +1,63 @@
-import AudioPlayer from "@/components/AudioPlayer";
-import Carousel from "@/components/Carousel";
 import Data from "@/types/ApiUserDataResponse";
+import getSignedUrl from "@/app/utils/getSignedUrl";
+import MainPage from "@/components/MainPage";
+import getUnzipFilesFromBuff from "./utils/getUnzipFilesFromBuff";
+import { getRecurseDir, folderExsist } from "./utils/getDirectories";
+import type { ImageData } from "../types/ApiUserDataResponse";
 
-const getData = async () => {
-  const audioSrc = "audios/videoplayback.mp3"; // 745
+const getData = async (zipFolder: string) => {
+  const remoteFolderWithOutExt = zipFolder.split(".")[0];
+  const outFolder = `public/${remoteFolderWithOutExt}`;
+  let files: string[];
+
+  if (!(await folderExsist(outFolder))) {
+    const signedUrl = getSignedUrl(zipFolder);
+    const res = await fetch(signedUrl, { cache: "no-store" });
+    const blob = await res.blob();
+    const arrBuff = await blob.arrayBuffer();
+    const buff = Buffer.from(arrBuff);
+    files = (await getUnzipFilesFromBuff(buff, outFolder)).map(
+      (file) => "/" + remoteFolderWithOutExt + "/" + file.path
+    );
+  } else {
+    files = (await getRecurseDir(outFolder)).map(
+      (file) =>
+        "/" +
+        file
+          .split("/")
+          .filter((f, i) => i > 0 && f)
+          .join("/")
+    );
+  }
+  const audioSrc = files.find((path) => path.includes("audios")) as string;
+  const jsonFile = files.find((f) => f.includes("json")) as string;
+  const jsonData = (await (
+    await fetch("http://127.0.0.1:3000" + jsonFile)
+  ).json()) as Data;
+  const images = files
+    .filter((path) => path.includes("images"))
+    .map(
+      (path, i): ImageData => ({
+        imageSrc: path,
+        href: "#" + path.split("/").at(-1),
+        startSecond: jsonData.images.at(i)?.startSecond as number,
+        endSecond: jsonData.images.at(i)?.endSecond as number,
+      })
+    );
+
   const data: Data = {
     audioSrc,
-    images: [
-      {
-        imageSrc: "/images/image1.jpg",
-        href: "#image1",
-        startSecond: 0,
-        endSecond: 124,
-      },
-      {
-        imageSrc: "/images/image2.jpg",
-        href: "#image2",
-        startSecond: 124,
-        endSecond: 248,
-      },
-      {
-        imageSrc: "/images/image3.jpg",
-        href: "#image3",
-        startSecond: 248,
-        endSecond: 372,
-      },
-      {
-        imageSrc: "/images/image4.jpg",
-        href: "#image4",
-        startSecond: 372,
-        endSecond: 496,
-      },
-      {
-        imageSrc: "/images/image5.jpg",
-        href: "#image5",
-        startSecond: 496,
-        endSecond: 620,
-      },
-      {
-        imageSrc: "/images/image6.jpg",
-        href: "#image6",
-        startSecond: 620,
-        endSecond: Infinity,
-      },
-    ],
+    images,
   };
   return data;
 };
 
 export default async function Home() {
-  const data = await getData();
+  const data = await getData("zipFolder.zip");
 
   return (
     <main className="flex min-h-screen items-start justify-center py-12 relative">
-      <div className="h-1/3 w-4/5">
-        <Carousel images={data.images} />
-        <div className="divider border-primary"></div>
-        <AudioPlayer data={data} />
-      </div>
+      <MainPage data={data} />
     </main>
   );
 }

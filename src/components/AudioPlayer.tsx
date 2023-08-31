@@ -15,7 +15,7 @@ export default function AduioPlayer({ data }: { data: Data }) {
     const currentTime = Math.round(ref.current.audio.current.currentTime);
     if (!ref.current.isPlaying()) return;
     data.images.forEach((el) => {
-      if (el.endSecond === Infinity) return;
+      if (el.endSecond === Infinity || el.endSecond === -1) return;
       if (currentTime >= el.startSecond && currentTime < el.endSecond) {
         router.push(el.href);
       }
